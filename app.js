@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkOnlineStatus();
     
     // Регистрируем Service Worker для PWA
-    registerServiceWorker();
+    //registerServiceWorker();
     
     // Скрываем загрузчик
     setTimeout(() => {
