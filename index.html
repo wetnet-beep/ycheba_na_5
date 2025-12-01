@@ -194,5 +194,25 @@ if (navigator.userAgent.includes('YaBrowser')) {
     </div>
     
     <script src="app.js"></script>
+    <script>
+// Фикс для Яндекс.Браузера
+if (navigator.userAgent.includes('YaBrowser')) {
+    console.log('Яндекс.Браузер обнаружен, отключаем проблемные функции');
+    
+    // Отключаем Service Worker
+    if (navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            registrations.forEach(function(registration) {
+                registration.unregister();
+            });
+        });
+    }
+    
+    // Отключаем PWA
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('PWA режим, игнорируем');
+    }
+}
+    </script>
 </body>
 </html>
