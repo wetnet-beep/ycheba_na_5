@@ -1,3 +1,11 @@
+// ОТКЛЮЧАЕМ Service Worker ДЛЯ ВСЕХ БРАУЗЕРОВ
+if (navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+            registration.unregister();
+        }
+    });
+}
 // Глобальные переменные
 let currentUser = null;
 let userKey = null;
