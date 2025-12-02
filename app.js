@@ -255,19 +255,16 @@ function initializeNavigation() {
     });
 }
 
-// ==================== РЕШАЛКА УРАВНЕНИЙ (ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ) ====================
+// ==================== РЕШАЛКА С MATH.JS ====================
 
 function initializeSolver() {
-    elements.solveBtn.addEventListener('click', solveEquation);
-    
+    elements.solveBtn.addEventListener('click', solveWithMathJS);
     elements.equationInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            solveEquation();
-        }
+        if (e.key === 'Enter') solveWithMathJS();
     });
 }
 
-function solveEquation() {
+function solveWithMathJS() {
     const equation = elements.equationInput.value.trim();
     
     if (!equation) {
@@ -275,199 +272,171 @@ function solveEquation() {
         return;
     }
     
+    // Проверяем доступ к премиум функциям
+    if (!isPremiumUser()) {
+        showNotification('Требуется активация ключа!', 'warning');
+        showBasicSolution(equation);
+        return;
+    }
+    
     try {
         elements.stepsContainer.innerHTML = '';
         elements.resultContainer.innerHTML = '';
         
-        const solution = solveEquationNew(equation);
+        // Решаем уравнение
+        const result = solveEquationMathJS(equation);
         
-        if (solution.error) {
-            elements.resultContainer.innerHTML = `<div class="error">${solution.error}</div>`;
-            return;
-        }
+        // Показываем шаги
+        showMathJSSteps(result.steps);
         
-        showSolutionStepsNew(solution.steps);
-        showSolutionResultNew(solution);
+        // Показываем результат
+        showMathJSResult(result);
         
         showNotification('Уравнение решено!', 'success');
         
     } catch (error) {
         console.error('Ошибка решения:', error);
         showNotification('Ошибка в уравнении!', 'error');
-        elements.resultContainer.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+        elements.resultContainer.innerHTML = `
+            <div class="error">
+                <h4>Ошибка решения</h4>
+                <p>${error.message}</p>
+                <p class="small">Примеры уравнений:</p>
+                <ul class="small">
+                    <li>2x + 5 = 15</li>
+                    <li>x^2 - 4 = 0</li>
+                    <li>3(x-4) = 21</li>
+                    <li>sin(x) = 0.5</li>
+                </ul>
+            </div>
+        `;
     }
 }
 
-// НОВАЯ ПРОСТАЯ И НАДЁЖНАЯ РЕШАЛКА
-function solveEquationNew(equation) {
-    // Очищаем уравнение
-    let eq = equation.replace(/\s/g, '').toLowerCase();
-    
-    // Проверяем наличие =
-    if (!eq.includes('=')) {
-        return { error: 'Уравнение должно содержать знак равенства (=)' };
-    }
-    
-    // Находим переменную (первую букву)
-    const variableMatch = eq.match(/[a-z]/i);
-    if (!variableMatch) {
-        return { error: 'Не найдена переменная (x, y, z, etc.)' };
-    }
-    const variable = variableMatch[0];
-    
-    // Простые замены для упрощения
-    eq = eq.replace(/\[/g, '(').replace(/\]/g, ')'); // Заменяем скобки
-    eq = eq.replace(/\{/g, '(').replace(/\}/g, ')');
-    
-    // ПРОСТОЙ МЕТОД ДЛЯ ЛИНЕЙНЫХ УРАВНЕНИЙ
-    const [left, right] = eq.split('=');
-    
-    // Шаги решения
+// Основная функция решения с math.js
+function solveEquationMathJS(equation) {
     const steps = [];
     steps.push(`Исходное уравнение: ${equation}`);
-    steps.push(`Упрощенное: ${eq}`);
     
-    // Если уравнение простое: ax + b = c
-    if (isSimpleLinear(left, variable) && isNumber(right)) {
-        return solveSimpleLinear(left, right, variable, steps);
-    }
+    // Нормализуем уравнение
+    const normalized = equation.replace(/\s/g, '').toLowerCase();
+    steps.push(`Нормализованное: ${normalized}`);
     
-    // Для уравнений со скобками используем численный метод
-    if (eq.includes('(') || eq.includes('*') || eq.includes('/')) {
-        return solveNumerical(eq, variable, steps);
-    }
+    // Находим переменные
+    const variables = [...new Set(normalized.match(/[a-z]/gi) || [])];
+    steps.push(`Найдены переменные: ${variables.join(', ')}`);
     
-    // Общий метод для уравнений типа: 2x + 3x + 5 = 20
-    return solveGeneralLinear(eq, variable, steps);
-}
-
-// Проверяем простое ли линейное уравнение
-function isSimpleLinear(expr, variable) {
-    const regex = new RegExp(`^[+-]?\\d*\\.?\\d*${variable}([+-]\\d+\\.?\\d*)?$`);
-    return regex.test(expr);
-}
-
-function isNumber(str) {
-    return /^[+-]?\d*\.?\d+$/.test(str);
-}
-
-// Решение простого линейного уравнения: ax + b = c
-function solveSimpleLinear(left, rightStr, variable, steps) {
-    const right = parseFloat(rightStr);
+    // Решаем уравнение
+    let solutions = [];
+    let solutionType = '';
     
-    // Находим a и b в ax + b
-    let a = 0, b = 0;
-    
-    // Разбираем left на части
-    const parts = left.split(/(?=[+-])/);
-    
-    parts.forEach(part => {
-        if (part === '') return;
+    if (variables.length === 1) {
+        const variable = variables[0];
         
-        const sign = part[0] === '-' ? -1 : 1;
-        const clean = part.replace(/^[+-]/, '');
-        
-        if (clean.includes(variable)) {
-            // Коэффициент при переменной
-            const coefStr = clean.replace(variable, '');
-            a += sign * (coefStr === '' ? 1 : parseFloat(coefStr));
-        } else {
-            // Константа
-            b += sign * parseFloat(clean);
-        }
-    });
-    
-    steps.push(`Выделяем коэффициенты: ${a}${variable} ${b >= 0 ? '+' : ''}${b} = ${right}`);
-    
-    // Переносим константу
-    const newRight = right - b;
-    steps.push(`Переносим константу: ${a}${variable} = ${newRight}`);
-    
-    if (a === 0) {
-        if (newRight === 0) {
-            return {
-                solution: 'Бесконечное число решений',
-                steps,
-                variable
-            };
-        } else {
-            return {
-                solution: 'Нет решений',
-                steps,
-                variable
-            };
-        }
-    }
-    
-    const solution = newRight / a;
-    const rounded = Math.round(solution * 100) / 100;
-    
-    steps.push(`Делим на коэффициент: ${variable} = ${newRight} / ${a}`);
-    steps.push(`Ответ: ${variable} = ${rounded}`);
-    
-    return {
-        variable,
-        solution: rounded,
-        steps,
-        originalEquation: `${left}=${right}`
-    };
-}
-
-// Численное решение для сложных уравнений
-function solveNumerical(eq, variable, steps) {
-    steps.push('Используем численный метод...');
-    
-    // Пробуем значения от -100 до 100
-    for (let x = -100; x <= 100; x += 0.01) {
         try {
-            const testEq = eq
-                .replace(new RegExp(variable, 'g'), `(${x})`)
-                .replace(/=/g, '-(') + ')';
+            // Пробуем алгебраическое решение
+            const expr = math.parse(normalized);
+            solutions = math.solve(expr, variable);
+            solutionType = 'algebraic';
+            steps.push(`Алгебраическое решение для ${variable}`);
             
-            const result = eval(testEq);
+        } catch (algebraicError) {
+            // Если не получилось алгебраически, используем численное
+            steps.push(`Алгебраическое решение не удалось, используем численное`);
             
-            if (Math.abs(result) < 0.001) {
-                const rounded = Math.round(x * 100) / 100;
-                steps.push(`Найдено решение: ${variable} ≈ ${rounded}`);
-                
-                return {
-                    variable,
-                    solution: rounded,
-                    steps,
-                    method: 'numerical'
-                };
-            }
-        } catch (e) {
-            continue;
+            // Ищем корни численно
+            solutions = findNumericalSolutions(normalized, variable);
+            solutionType = 'numerical';
         }
+        
+    } else if (variables.length > 1) {
+        steps.push(`Множественные переменные: ${variables.join(', ')}`);
+        steps.push(`Решаем для каждой переменной по отдельности`);
+        
+        // Для нескольких переменных решаем относительно каждой
+        solutions = [];
+        variables.forEach(variable => {
+            try {
+                const expr = math.parse(normalized);
+                const varSolution = math.solve(expr, variable);
+                solutions.push({ variable, solution: varSolution });
+            } catch (e) {
+                solutions.push({ variable, solution: 'не удалось решить' });
+            }
+        });
+        solutionType = 'multi';
     }
     
+    // Формируем ответ
     return {
-        error: 'Не удалось найти решение',
-        steps
+        equation,
+        normalized,
+        variables,
+        solutions,
+        solutionType,
+        steps,
+        solvedAt: new Date().toISOString()
     };
 }
 
-// Общее решение линейных уравнений
-function solveGeneralLinear(eq, variable, steps) {
-    const [left, right] = eq.split('=');
+// Численное решение если алгебраическое не работает
+function findNumericalSolutions(equation, variable) {
+    const solutions = [];
     
-    // Переносим всё влево
-    const fullExpr = `(${left})-(${right})`;
-    steps.push(`Переносим всё влево: ${fullExpr} = 0`);
+    // Преобразуем уравнение в функцию f(x) = 0
+    const f = (x) => {
+        try {
+            const expr = equation.replace(new RegExp(variable, 'g'), `(${x})`);
+            const leftRight = expr.split('=');
+            if (leftRight.length !== 2) return NaN;
+            
+            const left = eval(leftRight[0]);
+            const right = eval(leftRight[1]);
+            return left - right;
+        } catch (e) {
+            return NaN;
+        }
+    };
     
-    // Ищем решение численно
-    return solveNumerical(fullExpr + '=0', variable, steps);
+    // Ищем корни от -100 до 100
+    for (let x = -100; x <= 100; x += 0.5) {
+        const y1 = f(x);
+        const y2 = f(x + 0.5);
+        
+        // Если знак меняется, есть корень
+        if (y1 * y2 <= 0 && !isNaN(y1) && !isNaN(y2)) {
+            // Уточняем корень методом деления пополам
+            let a = x, b = x + 0.5;
+            for (let i = 0; i < 20; i++) {
+                const mid = (a + b) / 2;
+                const fMid = f(mid);
+                
+                if (Math.abs(fMid) < 0.0001) {
+                    const rounded = Math.round(mid * 1000) / 1000;
+                    if (!solutions.includes(rounded)) {
+                        solutions.push(rounded);
+                    }
+                    break;
+                }
+                
+                if (f(a) * fMid < 0) b = mid;
+                else a = mid;
+            }
+        }
+    }
+    
+    return solutions.length > 0 ? solutions : ['Не найдено численных решений'];
 }
 
-// Показать шаги решения (новая версия)
-function showSolutionStepsNew(steps) {
-    let stepsHTML = '';
+// Показать шаги решения
+function showMathJSSteps(steps) {
+    let stepsHTML = '<h3>Процесс решения:</h3>';
     
     steps.forEach((step, index) => {
         stepsHTML += `
             <div class="step">
-                <strong>Шаг ${index + 1}:</strong> ${step}
+                <span class="step-number">${index + 1}.</span>
+                <span class="step-text">${step}</span>
             </div>
         `;
     });
@@ -475,58 +444,136 @@ function showSolutionStepsNew(steps) {
     elements.stepsContainer.innerHTML = stepsHTML;
 }
 
-// Показать результат (новая версия)
-function showSolutionResultNew(solution) {
-    let resultHTML = '';
+// Показать результат
+function showMathJSResult(result) {
+    let resultHTML = '<div class="solution">';
     
-    if (solution.error) {
-        resultHTML = `<div class="error">${solution.error}</div>`;
-    } else if (typeof solution.solution === 'number') {
-        resultHTML = `
-            <div class="solution">
-                <h3><strong>${solution.variable} = ${solution.solution}</strong></h3>
-        `;
-        
-        // Проверка
-        try {
-            const equation = elements.equationInput.value.toLowerCase().replace(/\s/g, '');
-            const [left, right] = equation.split('=');
-            const testLeft = left.replace(new RegExp(solution.variable, 'g'), solution.solution);
-            const leftValue = eval(testLeft);
-            const rightValue = eval(right);
-            const diff = Math.abs(leftValue - rightValue);
-            
+    if (result.solutionType === 'multi') {
+        // Множественные переменные
+        resultHTML += '<h3>Решения:</h3>';
+        result.solutions.forEach(item => {
             resultHTML += `
-                <p><small>Проверка: ${leftValue} ≈ ${rightValue} (разница: ${diff.toFixed(4)})</small></p>
+                <div class="variable-solution">
+                    <strong>${item.variable}:</strong> 
+                    <span class="solution-value">${formatSolution(item.solution)}</span>
+                </div>
             `;
-        } catch (e) {
-            // Пропускаем проверку
+        });
+        
+    } else if (Array.isArray(result.solutions) && result.solutions.length > 0) {
+        // Одна переменная, несколько решений
+        const variable = result.variables[0];
+        
+        if (result.solutions.length === 1) {
+            resultHTML += `<h3>${variable} = ${formatSolution(result.solutions[0])}</h3>`;
+        } else {
+            resultHTML += `<h3>Решения для ${variable}:</h3>`;
+            result.solutions.forEach((sol, idx) => {
+                resultHTML += `
+                    <div class="solution-item">
+                        ${variable}<sub>${idx + 1}</sub> = ${formatSolution(sol)}
+                    </div>
+                `;
+            });
         }
         
-        resultHTML += `</div>`;
+        // Проверка решения
+        if (typeof result.solutions[0] === 'number') {
+            const check = verifySolution(result.equation, variable, result.solutions[0]);
+            if (check) {
+                resultHTML += `
+                    <div class="verification">
+                        <i class="fas fa-check-circle"></i>
+                        Проверка: ${check.left} ≈ ${check.right}
+                        <span class="small">(разница: ${check.difference.toFixed(6)})</span>
+                    </div>
+                `;
+            }
+        }
+        
     } else {
-        resultHTML = `
-            <div class="solution">
-                <h3><strong>${solution.solution}</strong></h3>
-            </div>
-        `;
+        resultHTML += '<h3>Решений не найдено</h3>';
     }
     
+    resultHTML += `
+        <div class="solution-info">
+            <span class="small">
+                <i class="fas fa-clock"></i> 
+                ${new Date(result.solvedAt).toLocaleTimeString()}
+                <i class="fas fa-calculator"></i>
+                ${result.solutionType === 'algebraic' ? 'Алгебраическое' : 'Численное'}
+            </span>
+        </div>
+    `;
+    
+    resultHTML += '</div>';
     elements.resultContainer.innerHTML = resultHTML;
 }
 
-// Старая функция для бесплатных пользователей
+// Форматирование решения
+function formatSolution(solution) {
+    if (typeof solution === 'number') {
+        // Округляем до 4 знаков
+        const rounded = Math.round(solution * 10000) / 10000;
+        // Убираем лишние нули
+        return parseFloat(rounded.toFixed(4)).toString();
+    }
+    return solution.toString();
+}
+
+// Проверка решения
+function verifySolution(equation, variable, value) {
+    try {
+        const eq = equation.replace(/\s/g, '').toLowerCase();
+        const [leftStr, rightStr] = eq.split('=');
+        
+        const leftWithVal = leftStr.replace(new RegExp(variable, 'g'), `(${value})`);
+        const rightWithVal = rightStr.replace(new RegExp(variable, 'g'), `(${value})`);
+        
+        const leftResult = math.evaluate(leftWithVal);
+        const rightResult = math.evaluate(rightWithVal);
+        const difference = Math.abs(leftResult - rightResult);
+        
+        return {
+            left: math.round(leftResult, 6),
+            right: math.round(rightResult, 6),
+            difference
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+// Для бесплатных пользователей
 function showBasicSolution(equation) {
     elements.resultContainer.innerHTML = `
         <div class="premium-locked">
             <i class="fas fa-lock"></i>
             <h4>Полное решение заблокировано</h4>
-            <p>Активируйте ключ для просмотра всех шагов решения</p>
+            <p>Активируйте ключ для использования Math.js решателя</p>
             <button class="btn btn-primary" onclick="document.querySelector('[href=\\'#key\\']').click()">
                 <i class="fas fa-key"></i> Активировать ключ
             </button>
         </div>
     `;
+    
+    // Всё равно показываем простой ответ
+    try {
+        const result = solveEquationMathJS(equation);
+        if (result.solutions && result.solutions.length > 0 && typeof result.solutions[0] === 'number') {
+            const variable = result.variables[0];
+            const solution = formatSolution(result.solutions[0]);
+            
+            elements.resultContainer.innerHTML += `
+                <div class="basic-answer">
+                    <p><strong>Ответ: ${variable} ≈ ${solution}</strong></p>
+                    <p class="small"><em>Активируйте ключ для подробных шагов</em></p>
+                </div>
+            `;
+        }
+    } catch (e) {
+        // Игнорируем ошибки для бесплатных пользователей
+    }
 }
 // ==================== МАТЕМАТИКА В СТОЛБИК (ИСПРАВЛЕННАЯ) ====================
 
