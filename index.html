@@ -1,12 +1,12 @@
-
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>УчебаНа5+ - Решалка и ГДЗ</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.7.0/math.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body class="light-theme">
     <div id="notification" class="notification"></div>
@@ -49,14 +49,14 @@
                 <h2><i class="fas fa-robot"></i> Умная решалка уравнений</h2>
                 <div class="solver-container">
                     <div class="input-group">
-                        <input type="text" id="equationInput" placeholder="Введите уравнение (например: 6x+2x+97=1561 или 2(x+3)=5x-2)" class="equation-input">
+                        <input type="text" id="equationInput" placeholder="Введите уравнение (например: 2x+5=15 или 3x=12)" class="equation-input">
                         <button id="solveBtn" class="btn btn-primary">
                             <i class="fas fa-play"></i> Решить
                         </button>
                     </div>
                     <div class="variables-info">
-                        <p><strong>Поддерживает:</strong> x, y, z, a, b, c, X, Y, Z</p>
-                        <p><strong>Примеры:</strong> 3x+5=20, 2(x-3)=4, x^2-4=0, 2x+3y=10</p>
+                        <p><strong>Поддерживает:</strong> простые линейные уравнения с x</p>
+                        <p><strong>Примеры:</strong> x+5=10, 2x=8, 3x-2=13, x/4=3</p>
                     </div>
                     <div id="solutionSteps" class="solution-steps">
                         <h3>Шаги решения:</h3>
@@ -110,7 +110,7 @@
                 <h2><i class="fas fa-key"></i> Активация ключа доступа</h2>
                 <div class="key-container">
                     <div class="key-info">
-                        <div class="key-timer" id="keyTimer">
+                        <div class="key-timer" id="keyTimer" style="display: none;">
                             <h3>Доступ активен: <span id="daysLeft">0</span> дней</h3>
                             <div class="progress-bar">
                                 <div id="progressFill" class="progress-fill"></div>
@@ -130,6 +130,7 @@
                                 <li><i class="fas fa-check-circle"></i> Подробные шаги решения</li>
                                 <li><i class="fas fa-check-circle"></i> Оффлайн режим</li>
                                 <li><i class="fas fa-check-circle"></i> Приоритетная поддержка</li>
+                                <li><i class="fas fa-check-circle"></i> До 50 фото в памятках</li>
                             </ul>
                         </div>
                     </div>
@@ -144,14 +145,18 @@
                         <div class="price">10 дней</div>
                         <div class="features">
                             <p><i class="fas fa-star"></i> Все функции разблокированы</p>
-                            <p><i class="fas fa-star"></i> Подробные решения</p>
+                            <p><i class="fas fa-star"></i> Подробные решения уравнений</p>
+                            <p><i class="fas fa-star"></i> Математика в столбик</p>
                             <p><i class="fas fa-star"></i> Работа оффлайн</p>
-                            <p><i class="fas fa-star"></i> Поддержка 24/7</p>
+                            <p><i class="fas fa-star"></i> До 50 фото в памятках</p>
                         </div>
                         <div class="special-offer">
                             <h4><i class="fas fa-gift"></i> Специальное предложение!</h4>
-                            <p class="highlight">1 пользователю 1 ключ бесплатно!</p>
-                            <p class="small">Попробуйте все функции прямо сейчас</p>
+                            <p class="highlight">Попробуйте бесплатно с тестовым ключом!</p>
+                            <p class="small">Используйте один из ключей для активации</p>
+                            <div class="test-keys">
+                                <p><strong>Тестовые ключи:</strong> UCH-NA5-SUN-723, UCH-NA5-MOON-841, UCH-NA5-STAR-309</p>
+                            </div>
                         </div>
                         <div class="contacts">
                             <h4><i class="fas fa-headset"></i> Свяжитесь для покупки:</h4>
@@ -184,42 +189,34 @@
         </footer>
     </div>
     
+    <!-- Подключаем скрипты в конце body -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.7.0/math.min.js"></script>
     <script src="app.js"></script>
+    
     <script>
-// Фикс для Яндекс.Браузера
-if (navigator.userAgent.includes('YaBrowser')) {
-    console.log('Яндекс.Браузер обнаружен, отключаем проблемные функции');
-    
-    // Отключаем Service Worker
-    if (navigator.serviceWorker) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            registrations.forEach(function(registration) {
-                registration.unregister();
+        // Фикс для Яндекс.Браузера
+        if (navigator.userAgent.includes('YaBrowser')) {
+            console.log('Яндекс.Браузер обнаружен');
+            
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    registrations.forEach(function(registration) {
+                        registration.unregister();
+                    });
+                });
+            }
+        }
+        
+        // Регистрация Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker зарегистрирован:', registration);
+                }).catch(error => {
+                    console.log('ServiceWorker ошибка:', error);
+                });
             });
-        });
-    }
-    
-    // Отключаем PWA
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        console.log('PWA режим, игнорируем');
-    }
-}
+        }
     </script>
-    <!-- В <head> или перед закрывающим </body> -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.7.0/math.min.js"></script>
-<!-- Стили для статистики -->
-<style>
-    #visitorCounter:hover {
-        background: rgba(0, 0, 0, 0.9);
-        transform: scale(1.05);
-    }
-    
-    .dark-theme #visitorCounter {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
-</style>
-    <!-- Вставь эту строку в <head> или перед закрывающим </body> -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.7.0/math.min.js"></script>
 </body>
 </html>
