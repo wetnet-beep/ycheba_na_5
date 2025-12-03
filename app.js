@@ -1106,4 +1106,74 @@ function generateUniqueVisitorId() {
     // Уникальный ID на основе времени + случайности + userAgent
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 12);
-    const user
+    const userAgent = navigator.userAgent.substring(0, 50);
+    const platform = navigator.platform;
+    
+    // Комбинируем и хешируем
+    const uniqueString = `${timestamp}_${random}_${userAgent}_${platform}`;
+    
+    // Простой хеш
+    let hash = 0;
+    for (let i = 0; i < uniqueString.length; i++) {
+        const char = uniqueString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return 'visitor_' + Math.abs(hash).toString(36);
+}
+
+function recordVisit() {
+    console.log('=== НАЧАЛО ПОСЕЩЕНИЯ ===');
+    console.log('UserAgent:', navigator.userAgent);
+    console.log('Platform:', navigator.platform);
+    console.log('Language:', navigator.language);
+    console.log('Старый visitorId:', localStorage.getItem('visitorId'));
+    
+    let visitorId = localStorage.getItem('visitorId');
+    
+    // ВСЕГДА создаём новый для проверки
+    const newVisitorId = generateUniqueVisitorId();
+    
+    // Если нет старого ИЛИ с другого устройства
+    const storedUserAgent = localStorage.getItem('userAgent');
+    const currentUserAgent = navigator.userAgent;
+    
+    if (!visitorId || storedUserAgent !== currentUserAgent) {
+        // Новое устройство или первый вход
+        visitorId = newVisitorId;
+        localStorage.setItem('visitorId', visitorId);
+        localStorage.setItem('userAgent', currentUserAgent);
+        
+        // Увеличиваем уникальных посетителей
+        let uniqueCount = parseInt(localStorage.getItem('uniqueVisitors') || '0');
+        uniqueCount++;
+        localStorage.setItem('uniqueVisitors', uniqueCount.toString());
+        
+        console.log('🔔 НОВЫЙ посетитель:', visitorId);
+    } else {
+        console.log('↩️ Возвращающийся посетитель:', visitorId);
+    }
+    
+    // Общий счетчик посещений
+    let totalCount = parseInt(localStorage.getItem('totalVisits') || '0');
+    totalCount++;
+    localStorage.setItem('totalVisits', totalCount.toString());
+    
+    // По дням
+    const today = new Date().toISOString().split('T')[0];
+    let todayStats = JSON.parse(localStorage.getItem('todayStats') || '{}');
+    
+    if (!todayStats.date || todayStats.date !== today) {
+        todayStats = { date: today, count: 1 };
+    } else {
+        todayStats.count++;
+    }
+    localStorage.setItem('todayStats', JSON.stringify(todayStats));
+    
+    console.log('Новый visitorId:', visitorId);
+    console.log('Уникальных всего:', localStorage.getItem('uniqueVisitors'));
+    console.log('Всего посещений:', totalCount);
+    console.log('Сегодня:', todayStats.count);
+    console.log('=== КОНЕЦ ПОСЕЩЕНИЯ ===');
+}
