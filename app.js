@@ -1,35 +1,31 @@
-// === САМЫЕ ПЕРВЫЕ СТРОКИ В app.js ===
+// === САМЫЕ ПЕРВЫЕ СТРОКИ В ФАЙЛЕ ===
+// ЗАЩИТА ОТ ПОВТОРНОГО ВЫПОЛНЕНИЯ
+if (window.__UCHEBANA5_LOADED__) {
+    console.error('❌ app.js уже выполнен, прекращаем');
+    throw new Error('Приложение уже загружено');
+}
+window.__UCHEBANA5_LOADED__ = true;
+
 // ЖЁСТКОЕ ОТКЛЮЧЕНИЕ SERVICE WORKER
 if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
-    console.log('🔒 Жесткое отключение Service Worker');
+    console.log('🔒 Навсегда отключаем Service Worker');
     
-    // 1. Отписываемся от всех существующих
+    // 1. Удаляем существующие
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
         registrations.forEach(function(registration) {
-            console.log('Удаляем SW:', registration.scope);
-            registration.unregister().then(function(success) {
-                console.log(success ? '✅ Успешно' : '❌ Не удалось');
-            });
+            console.log('🗑️ Удаляем:', registration.scope);
+            registration.unregister();
         });
     });
     
-    // 2. Блокируем ВСЕ будущие регистрации
+    // 2. Блокируем новые
     navigator.serviceWorker.register = function() {
-        console.log('❌ Регистрация Service Worker заблокирована');
-        return Promise.reject(new Error('Service Worker отключен администратором'));
+        console.error('🚫 Service Worker регистрация заблокирована');
+        return Promise.reject(new Error('Service Worker отключен'));
     };
-    
-    // 3. Отключаем контроллер если есть
-    if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({type: 'TERMINATE'});
-    }
 }
 
-// ТОЛЬКО ПОСЛЕ ЭТОГО ТВОЙ ОСТАЛЬНОЙ КОД
-let currentUser = null;
-// ... и так далее
-// app.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
-
+// ... остальной твой код БЕЗ ИЗМЕНЕНИЙ
 // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
 let currentUser = null;
 let userKey = null;
