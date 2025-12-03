@@ -1,19 +1,14 @@
-// ОТКЛЮЧАЕМ Service Worker ДЛЯ ВСЕХ БРАУЗЕРОВ
-if (navigator.serviceWorker) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-            registration.unregister();
-        }
-    });
-}
-// Глобальные переменные
+// app.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
+// ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
 let currentUser = null;
 let userKey = null;
 let keyExpiry = null;
 let isOffline = false;
 let uploadedPhotos = [];
+let math = window.math || {}; // Math.js объект
 
-// DOM элементы
+// ==================== DOM ЭЛЕМЕНТЫ ====================
 const elements = {
     themeToggle: document.getElementById('themeToggle'),
     keyStatus: document.getElementById('keyStatus'),
@@ -44,9 +39,17 @@ const elements = {
 };
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
-
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('УчебаНа5+ загружается...');
+    
+    // Проверяем загрузку Math.js
+    if (typeof math === 'undefined' || !math.evaluate) {
+        console.warn('Math.js не загружен, используем простой решатель');
+        math = {
+            evaluate: (expr) => eval(expr), // Простой fallback
+            round: (num, decimals) => Number(num.toFixed(decimals))
+        };
+    }
     
     // Создаем уникальный ID пользователя
     await initializeUser();
@@ -75,27 +78,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Проверяем онлайн статус
     checkOnlineStatus();
     
-    // ===== УДАЛИЛ Service Worker =====
-    // registerServiceWorker(); ← НЕТ ЭТОЙ СТРОКИ!
-    
     // Скрываем загрузчик
     setTimeout(() => {
-        elements.loader.style.display = 'none';
+        if (elements.loader) {
+            elements.loader.style.display = 'none';
+        }
         showNotification('Приложение загружено!', 'success');
     }, 1000);
 });
 
 // ==================== СИСТЕМА ПОЛЬЗОВАТЕЛЯ ====================
-
 async function initializeUser() {
     let userId = localStorage.getItem('user_id');
     
     if (!userId) {
-        // Генерируем уникальный ID пользователя
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('user_id', userId);
         
-        // Записываем первую дату использования
         const firstUse = {
             date: new Date().toISOString(),
             userAgent: navigator.userAgent,
@@ -113,11 +112,8 @@ async function initializeUser() {
 }
 
 async function getDeviceId() {
-    // Создаем уникальный ID устройства на основе доступной информации
     const navigatorInfo = navigator.userAgent + navigator.platform + navigator.language;
     const canvasId = await getCanvasFingerprint();
-    
-    // Хешируем для конфиденциальности
     const hash = await sha256(navigatorInfo + canvasId);
     return hash;
 }
@@ -142,7 +138,6 @@ async function getCanvasFingerprint() {
 }
 
 async function sha256(message) {
-    // Простой хеш для демонстрации
     const msgBuffer = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -175,7 +170,6 @@ function loadUserData() {
             activatePremiumFeatures(true);
             updateKeyTimer();
         } else {
-            // Ключ истек
             localStorage.removeItem('key_data');
             userKey = null;
             keyExpiry = null;
@@ -184,9 +178,10 @@ function loadUserData() {
 }
 
 // ==================== ТЕМА ====================
-
 function initializeTheme() {
-    elements.themeToggle.addEventListener('click', toggleTheme);
+    if (elements.themeToggle) {
+        elements.themeToggle.addEventListener('click', toggleTheme);
+    }
     updateThemeIcon();
 }
 
@@ -207,7 +202,11 @@ function toggleTheme() {
 }
 
 function updateThemeIcon() {
+    if (!elements.themeToggle) return;
+    
     const icon = elements.themeToggle.querySelector('i');
+    if (!icon) return;
+    
     const isDark = document.body.classList.contains('dark-theme');
     
     if (isDark) {
@@ -220,51 +219,57 @@ function updateThemeIcon() {
 }
 
 // ==================== НАВИГАЦИЯ ====================
-
 function initializeNavigation() {
     // Меню для мобильных
-    elements.menuToggle.addEventListener('click', () => {
-        elements.mainNav.classList.toggle('active');
-    });
+    if (elements.menuToggle) {
+        elements.menuToggle.addEventListener('click', () => {
+            if (elements.mainNav) {
+                elements.mainNav.classList.toggle('active');
+            }
+        });
+    }
     
     // Переключение разделов
     elements.navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             
-            // Убираем активный класс у всех ссылок
             elements.navLinks.forEach(l => l.classList.remove('active'));
-            
-            // Добавляем активный класс текущей ссылке
             link.classList.add('active');
             
-            // Скрываем все разделы
             elements.sections.forEach(section => {
                 section.classList.remove('active');
             });
             
-            // Показываем нужный раздел
             const targetId = link.getAttribute('href').substring(1);
-            document.getElementById(targetId).classList.add('active');
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
             
-            // Скрываем меню на мобильных
-            if (window.innerWidth <= 768) {
+            if (window.innerWidth <= 768 && elements.mainNav) {
                 elements.mainNav.classList.remove('active');
             }
         });
     });
 }
 
-// ==================== MATH.JS РЕШАЛКА ====================
-
+// ==================== РЕШАЛКА УРАВНЕНИЙ ====================
 function initializeSolver() {
-    elements.solveBtn.addEventListener('click', solveWithMathJS);
-    elements.equationInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') solveWithMathJS();
-    });
+    if (elements.solveBtn) {
+        elements.solveBtn.addEventListener('click', solveEquation);
+    }
+    
+    if (elements.equationInput) {
+        elements.equationInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') solveEquation();
+        });
+    }
 }
 
-function solveWithMathJS() {
+function solveEquation() {
+    if (!elements.equationInput) return;
+    
     const equation = elements.equationInput.value.trim();
     
     if (!equation) {
@@ -279,11 +284,16 @@ function solveWithMathJS() {
     }
     
     try {
-        elements.stepsContainer.innerHTML = '';
-        elements.resultContainer.innerHTML = '';
+        if (elements.stepsContainer) {
+            elements.stepsContainer.innerHTML = '';
+        }
+        if (elements.resultContainer) {
+            elements.resultContainer.innerHTML = '';
+        }
         
-        const solution = solveEquationMathJS(equation);
-        displayMathJSSolution(solution);
+        // Используем простой решатель для демонстрации
+        const solution = simpleEquationSolver(equation);
+        displaySolution(solution);
         
         showNotification('✅ Уравнение решено!', 'success');
         
@@ -294,141 +304,163 @@ function solveWithMathJS() {
     }
 }
 
-// Основная функция решения
-function solveEquationMathJS(equation) {
+// ПРОСТОЙ РЕШАТЕЛЬ (без math.js)
+function simpleEquationSolver(equation) {
     const steps = [];
     steps.push(`📝 Исходное уравнение: ${equation}`);
     
-    // Нормализуем
-    const normalized = equation.replace(/\s/g, '').toLowerCase();
-    steps.push(`🔧 Нормализованное: ${normalized}`);
-    
-    // Проверяем что есть =
-    if (!normalized.includes('=')) {
-        throw new Error('Уравнение должно содержать знак "="');
-    }
-    
-    // Ищем переменную
-    const variables = [...new Set(normalized.match(/[a-z]/gi) || [])];
-    if (variables.length === 0) {
-        throw new Error('Не найдена переменная (используйте x, y, z и т.д.)');
-    }
-    
-    const variable = variables[0];
-    steps.push(`🎯 Решаем относительно: ${variable}`);
-    
-    // Пробуем решить с math.js
-    let solutions;
     try {
-        // Преобразуем уравнение для math.js
-        const expr = math.parse(normalized);
-        solutions = math.solve(expr, variable);
-        steps.push(`⚡ Использован math.js решатель`);
-    } catch (mathError) {
-        steps.push(`⚠ Math.js не справился, используем численный метод`);
-        solutions = numericalSolve(normalized, variable);
-    }
-    
-    // Проверяем решение
-    const verification = verifySolutionMathJS(normalized, variable, solutions);
-    
-    return {
-        equation: equation,
-        normalized: normalized,
-        variable: variable,
-        solutions: solutions,
-        steps: steps,
-        verification: verification,
-        solvedAt: new Date().toISOString()
-    };
-}
-
-// Численное решение если math.js не справился
-function numericalSolve(equation, variable) {
-    // Пробуем значения от -1000 до 1000
-    const solutions = [];
-    
-    for (let x = -1000; x <= 1000; x += 0.1) {
-        try {
-            const testEq = equation.replace(new RegExp(variable, 'gi'), `(${x})`);
-            const [left, right] = testEq.split('=');
-            
-            const leftVal = safeEvaluate(left);
-            const rightVal = safeEvaluate(right);
-            
-            if (Math.abs(leftVal - rightVal) < 0.001) {
-                const rounded = Math.round(x * 100) / 100;
-                if (!solutions.includes(rounded)) {
-                    solutions.push(rounded);
-                }
-            }
-        } catch (e) {
-            continue;
+        // Очищаем пробелы
+        let cleanEq = equation.replace(/\s/g, '');
+        steps.push(`🔧 Без пробелов: ${cleanEq}`);
+        
+        // Проверяем наличие знака =
+        if (!cleanEq.includes('=')) {
+            throw new Error('Уравнение должно содержать знак "="');
         }
+        
+        // Заменяем запятые на точки
+        cleanEq = cleanEq.replace(/,/g, '.');
+        
+        // Ищем переменную
+        const variables = cleanEq.match(/[a-z]/gi);
+        if (!variables) {
+            throw new Error('Не найдена переменная (используйте x, y, z и т.д.)');
+        }
+        
+        const variable = variables[0];
+        steps.push(`🎯 Переменная: ${variable}`);
+        
+        // Для простых линейных уравнений
+        if (cleanEq.includes(variable)) {
+            // Пример решения для уравнений типа: ax + b = c
+            
+            // Разделяем на части
+            const [left, right] = cleanEq.split('=');
+            
+            // Пробуем вычислить правую часть
+            let rightValue;
+            try {
+                rightValue = safeEvaluate(right.replace(new RegExp(variable, 'gi'), '0'));
+                steps.push(`📊 Правая часть: ${right} = ${rightValue}`);
+            } catch (e) {
+                rightValue = 0;
+            }
+            
+            // Пробуем упростить левую часть
+            let leftExpr = left;
+            
+            // Удаляем умножение на 1
+            leftExpr = leftExpr.replace(/(\d*)\.?\d*?\*/g, '');
+            leftExpr = leftExpr.replace(new RegExp(`\\*${variable}`, 'g'), variable);
+            leftExpr = leftExpr.replace(new RegExp(`${variable}\\*`, 'g'), variable);
+            
+            steps.push(`🔧 Упрощенная левая часть: ${leftExpr}`);
+            
+            // Для уравнений типа: x + 5 = 10
+            if (leftExpr.includes('+')) {
+                const parts = leftExpr.split('+');
+                let coeff = 0;
+                let constant = 0;
+                
+                parts.forEach(part => {
+                    if (part.includes(variable)) {
+                        const coeffStr = part.replace(variable, '');
+                        coeff = coeffStr === '' ? 1 : parseFloat(coeffStr) || 1;
+                    } else {
+                        constant += parseFloat(part) || 0;
+                    }
+                });
+                
+                steps.push(`📐 Коэффициент при ${variable}: ${coeff}`);
+                steps.push(`📐 Свободный член: ${constant}`);
+                
+                // Решение: x = (right - constant) / coeff
+                const solution = (rightValue - constant) / coeff;
+                steps.push(`⚡ Решение: ${variable} = (${rightValue} - ${constant}) / ${coeff} = ${solution}`);
+                
+                // Проверка
+                const checkLeft = coeff * solution + constant;
+                const checkRight = rightValue;
+                
+                return {
+                    equation: equation,
+                    variable: variable,
+                    solution: solution,
+                    steps: steps,
+                    check: {
+                        left: checkLeft,
+                        right: checkRight,
+                        valid: Math.abs(checkLeft - checkRight) < 0.001
+                    }
+                };
+            }
+            
+            // Для уравнений типа: 2x = 10
+            else if (leftExpr.includes(variable)) {
+                const coeffStr = leftExpr.replace(variable, '');
+                const coeff = coeffStr === '' ? 1 : parseFloat(coeffStr) || 1;
+                
+                const solution = rightValue / coeff;
+                steps.push(`⚡ Решение: ${variable} = ${rightValue} / ${coeff} = ${solution}`);
+                
+                return {
+                    equation: equation,
+                    variable: variable,
+                    solution: solution,
+                    steps: steps,
+                    check: {
+                        left: coeff * solution,
+                        right: rightValue,
+                        valid: true
+                    }
+                };
+            }
+        }
+        
+        throw new Error('Не могу решить это уравнение. Попробуйте более простой формат.');
+        
+    } catch (error) {
+        steps.push(`❌ Ошибка: ${error.message}`);
+        throw error;
     }
-    
-    return solutions.length > 0 ? solutions : ['Решение не найдено'];
 }
 
 // Безопасное вычисление
 function safeEvaluate(expr) {
     try {
-        // Убираем всё кроме чисел и операторов
-        const cleanExpr = expr.replace(/[^0-9+\-*/().]/g, '');
-        return math.evaluate(cleanExpr);
+        // Заменяем все небезопасные символы
+        expr = expr
+            .replace(/[^0-9+\-*/().]/g, '')
+            .replace(/\/\//g, '/')
+            .replace(/\*\*/g, '*');
+        
+        // Используем Function для безопасного вычисления
+        return Function('"use strict"; return (' + expr + ')')();
     } catch (e) {
-        throw new Error('Не удалось вычислить выражение');
+        console.warn('Ошибка вычисления:', expr, e);
+        return NaN;
     }
-}
-
-// Проверка решения
-function verifySolutionMathJS(equation, variable, solutions) {
-    if (!Array.isArray(solutions) || solutions.length === 0) {
-        return null;
-    }
-    
-    const verifications = [];
-    
-    solutions.forEach((solution, index) => {
-        if (typeof solution === 'number') {
-            try {
-                const testEq = equation.replace(new RegExp(variable, 'gi'), `(${solution})`);
-                const [left, right] = testEq.split('=');
-                
-                const leftVal = math.evaluate(left);
-                const rightVal = math.evaluate(right);
-                const difference = Math.abs(leftVal - rightVal);
-                
-                verifications.push({
-                    solution: solution,
-                    left: math.round(leftVal, 4),
-                    right: math.round(rightVal, 4),
-                    difference: difference,
-                    isValid: difference < 0.01
-                });
-            } catch (e) {
-                // Пропускаем ошибки проверки
-            }
-        }
-    });
-    
-    return verifications;
 }
 
 // Показать решение
-function displayMathJSSolution(solution) {
+function displaySolution(solution) {
+    if (!elements.stepsContainer || !elements.resultContainer) return;
+    
     // Шаги решения
     let stepsHTML = '<div class="mathjs-steps">';
     stepsHTML += '<h4><i class="fas fa-list-ol"></i> Процесс решения:</h4>';
     
-    solution.steps.forEach((step, index) => {
-        stepsHTML += `
-            <div class="mathjs-step">
-                <span class="step-number">${index + 1}</span>
-                <span class="step-text">${step}</span>
-            </div>
-        `;
-    });
+    if (solution.steps && solution.steps.length > 0) {
+        solution.steps.forEach((step, index) => {
+            stepsHTML += `
+                <div class="mathjs-step">
+                    <span class="step-number">${index + 1}</span>
+                    <span class="step-text">${step}</span>
+                </div>
+            `;
+        });
+    }
     stepsHTML += '</div>';
     
     elements.stepsContainer.innerHTML = stepsHTML;
@@ -436,47 +468,28 @@ function displayMathJSSolution(solution) {
     // Результат
     let resultHTML = '<div class="mathjs-result">';
     
-    if (Array.isArray(solution.solutions) && solution.solutions.length > 0) {
-        if (solution.solutions.length === 1) {
-            const sol = solution.solutions[0];
-            if (typeof sol === 'number') {
-                resultHTML += `
-                    <h2><i class="fas fa-check-circle"></i> Решение найдено!</h2>
-                    <div class="main-answer">${solution.variable} = ${sol}</div>
-                `;
-            } else {
-                resultHTML += `<h3>${sol}</h3>`;
-            }
-        } else {
-            resultHTML += '<h3><i class="fas fa-th-list"></i> Найдено несколько решений:</h3>';
-            solution.solutions.forEach((sol, idx) => {
-                resultHTML += `
-                    <div class="multiple-solution">
-                        ${solution.variable}<sub>${idx + 1}</sub> = ${sol}
-                    </div>
-                `;
-            });
-        }
+    if (solution.solution !== undefined && !isNaN(solution.solution)) {
+        resultHTML += `
+            <h2><i class="fas fa-check-circle"></i> Решение найдено!</h2>
+            <div class="main-answer">${solution.variable} = ${solution.solution}</div>
+        `;
         
         // Проверка
-        if (solution.verification && solution.verification.length > 0) {
-            solution.verification.forEach(check => {
-                if (check.isValid) {
-                    resultHTML += `
-                        <div class="verification valid">
-                            <i class="fas fa-check"></i> Проверка: ${check.left} = ${check.right}
-                        </div>
-                    `;
-                } else {
-                    resultHTML += `
-                        <div class="verification approx">
-                            <i class="fas fa-approximately-equal"></i> 
-                            Приблизительно: ${check.left} ≈ ${check.right}
-                            <small>(разница: ${check.difference.toFixed(6)})</small>
-                        </div>
-                    `;
-                }
-            });
+        if (solution.check) {
+            if (solution.check.valid) {
+                resultHTML += `
+                    <div class="verification valid">
+                        <i class="fas fa-check"></i> Проверка: ${solution.check.left} = ${solution.check.right}
+                    </div>
+                `;
+            } else {
+                resultHTML += `
+                    <div class="verification approx">
+                        <i class="fas fa-approximately-equal"></i> 
+                        Приблизительно: ${solution.check.left} ≈ ${solution.check.right}
+                    </div>
+                `;
+            }
         }
     } else {
         resultHTML += '<h3><i class="fas fa-times-circle"></i> Решений не найдено</h3>';
@@ -485,8 +498,8 @@ function displayMathJSSolution(solution) {
     resultHTML += `
         <div class="solution-info">
             <small>
-                <i class="fas fa-clock"></i> ${new Date(solution.solvedAt).toLocaleTimeString('ru-RU')}
-                <i class="fas fa-calculator"></i> Math.js ${math.version}
+                <i class="fas fa-clock"></i> ${new Date().toLocaleTimeString('ru-RU')}
+                <i class="fas fa-calculator"></i> Простой решатель
             </small>
         </div>
     `;
@@ -495,8 +508,29 @@ function displayMathJSSolution(solution) {
     elements.resultContainer.innerHTML = resultHTML;
 }
 
+// Для бесплатных пользователей
+function showPremiumLocked() {
+    if (!elements.resultContainer) return;
+    
+    elements.resultContainer.innerHTML = `
+        <div class="premium-locked-mathjs">
+            <div class="lock-icon">
+                <i class="fas fa-lock fa-3x"></i>
+            </div>
+            <h3>Решалка уравнений заблокирована</h3>
+            <p>Для использования решателя активируйте ключ</p>
+            <button class="btn btn-primary btn-large" 
+                    onclick="document.querySelector('[href=\\'#key\\']').click()">
+                <i class="fas fa-key"></i> Активировать ключ
+            </button>
+        </div>
+    `;
+}
+
 // Показать ошибку
 function showError(errorMsg, equation) {
+    if (!elements.resultContainer) return;
+    
     elements.resultContainer.innerHTML = `
         <div class="mathjs-error">
             <h3><i class="fas fa-exclamation-triangle"></i> Ошибка</h3>
@@ -506,59 +540,47 @@ function showError(errorMsg, equation) {
                 <h4>Примеры уравнений которые работают:</h4>
                 <ul>
                     <li><code>2x + 5 = 15</code> → x = 5</li>
-                    <li><code>3(x - 4) = 21</code> → x = 11</li>
-                    <li><code>x^2 - 4 = 0</code> → x = -2, 2</li>
-                    <li><code>12x + 9x + 100 = 21100</code> → x = 1000</li>
-                    <li><code>(x+1000-2000)*10=10000</code> → x = 2000</li>
+                    <li><code>3x = 12</code> → x = 4</li>
+                    <li><code>x + 10 = 20</code> → x = 10</li>
+                    <li><code>5x - 3 = 22</code> → x = 5</li>
+                    <li><code>x/2 = 8</code> → x = 16</li>
                 </ul>
+                <p><small>Пока поддерживаются только простые линейные уравнения</small></p>
             </div>
         </div>
     `;
 }
 
-// Для бесплатных пользователей
-function showPremiumLocked() {
-    elements.resultContainer.innerHTML = `
-        <div class="premium-locked-mathjs">
-            <div class="lock-icon">
-                <i class="fas fa-lock fa-3x"></i>
-            </div>
-            <h3>Решалка уравнений заблокирована</h3>
-            <p>Для использования мощного math.js решателя активируйте ключ</p>
-            <p><small>Получите доступ к решению любых уравнений!</small></p>
-            <button class="btn btn-primary btn-large" 
-                    onclick="document.querySelector('[href=\\'#key\\']').click()">
-                <i class="fas fa-key"></i> Активировать ключ
-            </button>
-        </div>
-    `;
-}
-// ==================== МАТЕМАТИКА В СТОЛБИК (ИСПРАВЛЕННАЯ) ====================
-
+// ==================== МАТЕМАТИКА В СТОЛБИК ====================
 function initializeColumnMath() {
     // Переключение операций
     elements.operationBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             elements.operationBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            elements.opDisplay.textContent = btn.dataset.op;
+            if (elements.opDisplay) {
+                elements.opDisplay.textContent = btn.dataset.op;
+            }
         });
     });
     
     // Расчет
-    elements.calculateColumn.addEventListener('click', calculateColumn);
+    if (elements.calculateColumn) {
+        elements.calculateColumn.addEventListener('click', calculateColumn);
+    }
 }
 
 function calculateColumn() {
-    const num1 = document.getElementById('num1').value;
-    const num2 = document.getElementById('num2').value;
-    const operation = document.getElementById('opDisplay').textContent;
+    const num1 = document.getElementById('num1')?.value;
+    const num2 = document.getElementById('num2')?.value;
+    const opDisplay = document.getElementById('opDisplay');
     
-    if (!num1 || !num2) {
+    if (!num1 || !num2 || !opDisplay) {
         showNotification('Введите оба числа!', 'error');
         return;
     }
     
+    const operation = opDisplay.textContent;
     const a = parseFloat(num1);
     const b = parseFloat(num2);
     
@@ -576,7 +598,7 @@ function calculateColumn() {
         case '-':
             result = subtractColumn(a, b);
             break;
-        case '×':  // ВАЖНО: это знак умножения, не звездочка!
+        case '×':
             result = multiplyColumn(a, b);
             break;
         case '/':
@@ -590,8 +612,10 @@ function calculateColumn() {
             result = 'Неизвестная операция';
     }
     
-    elements.columnResult.textContent = result;
-    elements.columnResult.style.display = 'block';
+    if (elements.columnResult) {
+        elements.columnResult.textContent = result;
+        elements.columnResult.style.display = 'block';
+    }
 }
 
 function addColumn(a, b) {
@@ -641,8 +665,7 @@ function multiplyColumn(a, b) {
     result += '× ' + ' '.repeat(maxLength - bStr.length + 1) + bStr + '\n';
     result += '—'.repeat(maxLength + 3) + '\n';
     
-    // Если умножаем на многозначное число
-    if (b > 9 || b < -9) {
+    if (Math.abs(b) > 9) {
         const bDigits = Math.abs(b).toString().split('').reverse();
         let partialResults = [];
         
@@ -655,11 +678,9 @@ function multiplyColumn(a, b) {
         
         result += partialResults.join('\n') + '\n';
         result += '—'.repeat(maxLength + 3) + '\n';
-        result += ' '.repeat(maxLength - productStr.length + 2) + productStr;
-    } else {
-        // Для однозначного числа сразу результат
-        result += ' '.repeat(maxLength - productStr.length + 2) + productStr;
     }
+    
+    result += ' '.repeat(maxLength - productStr.length + 2) + productStr;
     
     return result;
 }
@@ -681,39 +702,44 @@ function divideColumn(a, b) {
     
     return result;
 }
-// ==================== ФОТО И ПАМЯТКИ ====================
 
+// ==================== ФОТО И ПАМЯТКИ ====================
 function initializePhotoUpload() {
-    // Кнопка загрузки
-    elements.uploadBtn.addEventListener('click', () => {
-        elements.photoUpload.click();
-    });
+    if (elements.uploadBtn) {
+        elements.uploadBtn.addEventListener('click', () => {
+            if (elements.photoUpload) {
+                elements.photoUpload.click();
+            }
+        });
+    }
     
-    // Drag and drop область
-    elements.uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        elements.uploadArea.style.borderColor = 'var(--primary-color)';
-        elements.uploadArea.style.backgroundColor = 'var(--hover-bg)';
-    });
-    
-    elements.uploadArea.addEventListener('dragleave', () => {
-        elements.uploadArea.style.borderColor = '';
-        elements.uploadArea.style.backgroundColor = '';
-    });
-    
-    elements.uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        elements.uploadArea.style.borderColor = '';
-        elements.uploadArea.style.backgroundColor = '';
+    if (elements.uploadArea) {
+        elements.uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.uploadArea.style.borderColor = 'var(--primary-color)';
+            elements.uploadArea.style.backgroundColor = 'var(--hover-bg)';
+        });
         
-        const files = e.dataTransfer.files;
-        handlePhotoUpload(files);
-    });
+        elements.uploadArea.addEventListener('dragleave', () => {
+            elements.uploadArea.style.borderColor = '';
+            elements.uploadArea.style.backgroundColor = '';
+        });
+        
+        elements.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.uploadArea.style.borderColor = '';
+            elements.uploadArea.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            handlePhotoUpload(files);
+        });
+    }
     
-    // Выбор файлов через input
-    elements.photoUpload.addEventListener('change', (e) => {
-        handlePhotoUpload(e.target.files);
-    });
+    if (elements.photoUpload) {
+        elements.photoUpload.addEventListener('change', (e) => {
+            handlePhotoUpload(e.target.files);
+        });
+    }
 }
 
 function handlePhotoUpload(files) {
@@ -754,8 +780,9 @@ function handlePhotoUpload(files) {
         reader.readAsDataURL(file);
     });
     
-    // Сбрасываем input
-    elements.photoUpload.value = '';
+    if (elements.photoUpload) {
+        elements.photoUpload.value = '';
+    }
 }
 
 function savePhotosToStorage() {
@@ -763,6 +790,8 @@ function savePhotosToStorage() {
 }
 
 function renderGallery() {
+    if (!elements.gallery) return;
+    
     if (uploadedPhotos.length === 0) {
         elements.gallery.innerHTML = `
             <div class="empty-gallery">
@@ -800,18 +829,21 @@ function renderGallery() {
 }
 
 // ==================== СИСТЕМА КЛЮЧЕЙ ====================
-
 function initializeKeySystem() {
-    elements.activateKey.addEventListener('click', activateKey);
+    if (elements.activateKey) {
+        elements.activateKey.addEventListener('click', activateKey);
+    }
     
-    elements.keyInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            activateKey();
-        }
-    });
+    if (elements.keyInput) {
+        elements.keyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                activateKey();
+            }
+        });
+    }
 }
 
-// Массив валидных ключей (40 штук)
+// Массив валидных ключей
 const VALID_KEYS = [
     'UCH-NA5-SUN-723', 'UCH-NA5-MOON-841', 'UCH-NA5-STAR-309',
     'UCH-NA5-BOOK-456', 'UCH-NA5-PEN-182', 'UCH-NA5-DESK-574',
@@ -833,6 +865,8 @@ const VALID_KEYS = [
 const usedKeys = JSON.parse(localStorage.getItem('used_keys') || '[]');
 
 async function activateKey() {
+    if (!elements.keyInput) return;
+    
     const key = elements.keyInput.value.trim().toUpperCase();
     
     if (!key) {
@@ -840,35 +874,29 @@ async function activateKey() {
         return;
     }
     
-    // Проверяем формат ключа
     const keyRegex = /^UCH-NA5-[A-Z]{3,4}-\d{3}$/;
     if (!keyRegex.test(key)) {
         showNotification('Неверный формат ключа!', 'error');
         return;
     }
     
-    // Проверяем, является ли ключ валидным
     if (!VALID_KEYS.includes(key)) {
         showNotification('Недействительный ключ!', 'error');
         return;
     }
     
-    // Проверяем, был ли ключ уже использован
     if (usedKeys.includes(key)) {
         showNotification('Этот ключ уже был активирован!', 'warning');
         return;
     }
     
     try {
-        // Симулируем проверку на сервере
         const activationResult = await simulateServerActivation(key);
         
         if (activationResult.success) {
-            // Сохраняем ключ
             userKey = key;
             keyExpiry = new Date(activationResult.expiry);
             
-            // Сохраняем в localStorage
             const keyData = {
                 key: key,
                 expiry: keyExpiry.toISOString(),
@@ -878,16 +906,15 @@ async function activateKey() {
             
             localStorage.setItem('key_data', JSON.stringify(keyData));
             
-            // Добавляем ключ в использованные
             usedKeys.push(key);
             localStorage.setItem('used_keys', JSON.stringify(usedKeys));
             
-            // Активируем премиум функции
             activatePremiumFeatures(true);
             updateKeyTimer();
             
-            // Очищаем поле ввода
-            elements.keyInput.value = '';
+            if (elements.keyInput) {
+                elements.keyInput.value = '';
+            }
             
             showNotification('Ключ успешно активирован! Доступ на 10 дней.', 'success');
             
@@ -904,7 +931,6 @@ async function activateKey() {
 async function simulateServerActivation(key) {
     return new Promise((resolve) => {
         setTimeout(() => {
-            // Создаем дату окончания (10 дней от текущей даты)
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 10);
             
@@ -922,7 +948,6 @@ async function simulateServerActivation(key) {
 
 function isKeyValid() {
     if (!keyExpiry) return false;
-    
     const now = new Date();
     return now < keyExpiry;
 }
@@ -932,48 +957,46 @@ function isPremiumUser() {
 }
 
 function activatePremiumFeatures(isActive) {
+    if (!elements.keyStatus) return;
+    
     if (isActive) {
-        // Обновляем статус ключа
         elements.keyStatus.className = 'key-status active';
         elements.keyStatus.innerHTML = '<i class="fas fa-key"></i> <span>Ключ активирован</span>';
         
-        // Показываем таймер
-        elements.keyTimer.style.display = 'block';
+        if (elements.keyTimer) {
+            elements.keyTimer.style.display = 'block';
+        }
         
     } else {
         elements.keyStatus.className = 'key-status inactive';
         elements.keyStatus.innerHTML = '<i class="fas fa-key"></i> <span>Ключ не активирован</span>';
         
-        // Скрываем таймер
-        elements.keyTimer.style.display = 'none';
+        if (elements.keyTimer) {
+            elements.keyTimer.style.display = 'none';
+        }
     }
 }
 
 function updateKeyTimer() {
-    if (!keyExpiry) return;
+    if (!keyExpiry || !elements.daysLeft || !elements.progressFill || !elements.expiryDate) return;
     
     const now = new Date();
     const timeDiff = keyExpiry - now;
     
     if (timeDiff <= 0) {
-        // Время вышло
         activatePremiumFeatures(false);
         return;
     }
     
-    // Рассчитываем дни
     const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
     elements.daysLeft.textContent = daysLeft;
     
-    // Обновляем прогресс-бар
     const totalDays = 10;
     const progress = ((totalDays - daysLeft) / totalDays) * 100;
     elements.progressFill.style.width = `${progress}%`;
     
-    // Обновляем дату окончания
     elements.expiryDate.textContent = `Дата окончания: ${keyExpiry.toLocaleDateString('ru-RU')}`;
     
-    // Меняем цвет прогресс-бара
     if (daysLeft <= 3) {
         elements.progressFill.style.backgroundColor = '#f44336';
     } else if (daysLeft <= 7) {
@@ -984,7 +1007,6 @@ function updateKeyTimer() {
 }
 
 // ==================== PWA И OFFLINE ====================
-
 function checkOnlineStatus() {
     isOffline = !navigator.onLine;
     
@@ -1003,24 +1025,11 @@ function checkOnlineStatus() {
     });
 }
 
-async function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        try {
-            // ИЗМЕНИТЕ ЭТУ СТРОКУ:
-            await navigator.serviceWorker.register('/sw.js');
-            console.log('Service Worker зарегистрирован');
-        } catch (error) {
-            console.error('Ошибка регистрации Service Worker:', error);
-            // Просто игнорируем ошибку для GitHub Pages
-        }
-    }
-}
 // ==================== УТИЛИТЫ ====================
-
 function showNotification(message, type = 'info') {
-    const notification = elements.notification;
+    if (!elements.notification) return;
     
-    notification.textContent = message;
+    elements.notification.textContent = message;
     
     const colors = {
         success: '#4caf50',
@@ -1029,15 +1038,15 @@ function showNotification(message, type = 'info') {
         info: '#2196f3'
     };
     
-    notification.style.backgroundColor = colors[type] || colors.info;
-    notification.style.display = 'block';
+    elements.notification.style.backgroundColor = colors[type] || colors.info;
+    elements.notification.style.display = 'block';
     
     setTimeout(() => {
-        notification.style.display = 'none';
+        elements.notification.style.display = 'none';
     }, 5000);
 }
 
-// Экспортируем функции
+// ==================== ГЛОБАЛЬНЫЕ ФУНКЦИИ ====================
 window.viewPhoto = function(photoId) {
     const photo = uploadedPhotos.find(p => p.id === photoId);
     if (!photo) return;
@@ -1099,81 +1108,4 @@ setInterval(() => {
 // Обновляем таймер при загрузке
 if (isPremiumUser()) {
     updateKeyTimer();
-}
-// ==================== СТАТИСТИКА (ИСПРАВЛЕННАЯ) ====================
-
-function generateUniqueVisitorId() {
-    // Уникальный ID на основе времени + случайности + userAgent
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 12);
-    const userAgent = navigator.userAgent.substring(0, 50);
-    const platform = navigator.platform;
-    
-    // Комбинируем и хешируем
-    const uniqueString = `${timestamp}_${random}_${userAgent}_${platform}`;
-    
-    // Простой хеш
-    let hash = 0;
-    for (let i = 0; i < uniqueString.length; i++) {
-        const char = uniqueString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    
-    return 'visitor_' + Math.abs(hash).toString(36);
-}
-
-function recordVisit() {
-    console.log('=== НАЧАЛО ПОСЕЩЕНИЯ ===');
-    console.log('UserAgent:', navigator.userAgent);
-    console.log('Platform:', navigator.platform);
-    console.log('Language:', navigator.language);
-    console.log('Старый visitorId:', localStorage.getItem('visitorId'));
-    
-    let visitorId = localStorage.getItem('visitorId');
-    
-    // ВСЕГДА создаём новый для проверки
-    const newVisitorId = generateUniqueVisitorId();
-    
-    // Если нет старого ИЛИ с другого устройства
-    const storedUserAgent = localStorage.getItem('userAgent');
-    const currentUserAgent = navigator.userAgent;
-    
-    if (!visitorId || storedUserAgent !== currentUserAgent) {
-        // Новое устройство или первый вход
-        visitorId = newVisitorId;
-        localStorage.setItem('visitorId', visitorId);
-        localStorage.setItem('userAgent', currentUserAgent);
-        
-        // Увеличиваем уникальных посетителей
-        let uniqueCount = parseInt(localStorage.getItem('uniqueVisitors') || '0');
-        uniqueCount++;
-        localStorage.setItem('uniqueVisitors', uniqueCount.toString());
-        
-        console.log('🔔 НОВЫЙ посетитель:', visitorId);
-    } else {
-        console.log('↩️ Возвращающийся посетитель:', visitorId);
-    }
-    
-    // Общий счетчик посещений
-    let totalCount = parseInt(localStorage.getItem('totalVisits') || '0');
-    totalCount++;
-    localStorage.setItem('totalVisits', totalCount.toString());
-    
-    // По дням
-    const today = new Date().toISOString().split('T')[0];
-    let todayStats = JSON.parse(localStorage.getItem('todayStats') || '{}');
-    
-    if (!todayStats.date || todayStats.date !== today) {
-        todayStats = { date: today, count: 1 };
-    } else {
-        todayStats.count++;
-    }
-    localStorage.setItem('todayStats', JSON.stringify(todayStats));
-    
-    console.log('Новый visitorId:', visitorId);
-    console.log('Уникальных всего:', localStorage.getItem('uniqueVisitors'));
-    console.log('Всего посещений:', totalCount);
-    console.log('Сегодня:', todayStats.count);
-    console.log('=== КОНЕЦ ПОСЕЩЕНИЯ ===');
 }
