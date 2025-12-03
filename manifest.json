@@ -1,9 +1,23 @@
 {
-    "name": "УчебаНа5+",
+    "name": "УчебаНа5+ - Оффлайн решалка",
     "short_name": "УчебаНа5",
-    "description": "Оффлайн решалка уравнений",
-    "start_url": "/uchebana5/",
+    "description": "Решатель уравнений, математика в столбик, памятки и ГДЗ оффлайн",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#2196f3",
-    "theme_color": "#2196f3"
+    "theme_color": "#2196f3",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "categories": ["education", "productivity"],
+    "orientation": "portrait"
 }
